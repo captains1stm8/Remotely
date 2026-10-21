@@ -1,0 +1,41 @@
+# Builds the client packages served from /Downloads (agent, screencasters, desktop apps).
+# Remotely_ScreenCast.Win and Remotely_Desktop.Win are .NET Framework 4.7.2, so this runs on Windows.
+# Output artifact "remotely-downloads" is extracted into Remotely_Server/wwwroot before building the server image.
+name: Build clients
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ccr-0771b181-v6yhqy]
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Build .NET Framework projects
+        run: |
+          nuget restore Remotely.sln
+          msbuild Remotely_Desktop.Win\Remotely_Desktop.Win.csproj /p:Configuration=Release /m
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 2.2.207
+
+      - name: Publish clients
+        shell: powershell
+        run: |
+          '{ "sdk": { "version": "2.2.207" } }' | Set-Content global.json
+          dotnet --version
+          .\Utilities\Publish.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: remotely-downloads
+          if-no-files-found: error
+          path: |
+            Remotely_Server/wwwroot/Downloads/
+            Remotely_Server/CurrentVersion.txt
