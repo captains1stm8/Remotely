@@ -16,6 +16,12 @@ Verified in a test environment (2026-10-21): image builds; `/`, `/Identity/Accou
 Run from the repo root. Requires root or sudo.
 
 1. Install Docker and nginx if they are missing: `apt-get install -y docker.io nginx` (Debian/Ubuntu).
+1b. Client packages: the GitHub Actions workflow `.github/workflows/build-clients.yml` builds them on Windows and uploads artifact `remotely-downloads` (agent zips, desktop apps, `CurrentVersion.txt`). Put them into the source tree **before** building the image. This needs the `gh` CLI logged in (`gh auth login`), because GitHub requires auth to download artifacts:
+   ```bash
+   gh run download -R captains1stm8/Remotely -n remotely-downloads -D Remotely_Server
+   ls Remotely_Server/wwwroot/Downloads   # expect Remotely-Win10-x64.zip, Remotely-Win10-x86.zip, Remotely-Linux.zip, Remotely_Desktop.Unix.zip, Remotely_Desktop.exe
+   ```
+   Artifacts expire 90 days after the run. To rebuild, push to `ccr-0771b181-v6yhqy`.
 2. Build: `docker build -f deploy/Dockerfile -t remotely-server .`
    - Expected warnings: NU1608 (Microsoft.CodeAnalysis version constraint). Harmless.
 3. Run:
@@ -36,6 +42,6 @@ Run from the repo root. Requires root or sudo.
 - Back up the DB: `docker run --rm -v remotely-data:/data -v "$PWD":/b ubuntu:24.04 cp /data/Server.db /b/`.
 
 ## Known gaps
-- `wwwroot/Downloads` contains only the install scripts. The agent and desktop zips/exes they reference are produced by `Utilities/Publish.ps1`, which needs Windows for the .NET Framework projects. Agent downloads from this server will 404 until those are built and copied into the container's `/app/wwwroot/Downloads`.
+- In git, `wwwroot/Downloads` contains only the install scripts. Skip step 1b and the agent and desktop downloads will 404. The Windows build is done by GitHub Actions (`windows-2022` runner running `Utilities/Publish.ps1`). It last passed on run 39544269213 with 0 errors.
 - Session recording (`RecordRemoteControlSessions`) is untested. The code starts the literal `ffmpeg.exe`, so the image symlinks `/usr/local/bin/ffmpeg.exe` → ffmpeg. Recordings are written under `/app` and are lost when the container is recreated unless you mount a volume.
 - .NET Core 2.2 and the bionic base images get no security patches. Don't expose port 5000 directly. Keep it behind nginx on loopback.
